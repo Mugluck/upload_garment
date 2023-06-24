@@ -2,10 +2,12 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -15,6 +17,9 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/grokify/go-awslambda"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -39,6 +44,8 @@ type User struct {
 
 var ExposeServerErrors = true
 var uri = os.Getenv("ATLAS_URI")
+var awsBucket = os.Getenv("AWS_BUCKET")
+var awsS3Client *s3.Client
 var client, err = mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
 
 //endpoints
@@ -234,4 +241,31 @@ func MarshalResponse(httpStatus int, headers map[string]string, data interface{}
 		Headers:         headers,
 		Body:            string(b),
 	}, nil
+}
+
+func uploadFile(data []byte, fileName string, key string) error {
+
+	// Get a file from the form input name "file"
+	// get file body
+	// file := getReader(path + fileName)
+	reader := io.Reader(bytes.NewReader(data))
+
+	uploader := manager.NewUploader(awsS3Client)
+	_, err := uploader.Upload(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(awsBucket),
+		Key:    aws.String(key),
+		Body:   reader,
+	})
+
+	return err
+}
+
+func getReader(path string) io.Reader {
+	// Read the entire file into a byte slice
+	reader, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return reader
 }
