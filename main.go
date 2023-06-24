@@ -10,10 +10,12 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/grokify/go-awslambda"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -52,35 +54,73 @@ type HTTPError struct {
 	Message string `json:"message"`
 }
 
-func HandleRequest(ctx context.Context, event MyEvent) (string, error) {
+type customStruct struct {
+	Content       string
+	FileName      string
+	FileExtension string
+}
+
+func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 
 	if err != nil {
 		return uri, err
 	}
 
+	userId := request.PathParameters["user_id"]
 	users := client.Database("drape_manager").Collection("users")
 
-	userSearch := users.FindOne(context.Background(), bson.M{"id": event.UserId})
+	userSearch := users.FindOne(context.Background(), bson.M{"id": userId})
 	user := User{}
 	err := userSearch.Decode(&user)
 	if err != nil {
 		return "", err
 	}
 
+	garmentId := request.PathParameters["garment_id"]
 	garments := client.Database("drape_manager").Collection("garments")
-	garmentSearch := garments.FindOne(context.Background(), bson.M{"id": event.UserId})
+	garmentSearch := garments.FindOne(context.Background(), bson.M{"id": garmentId})
 	garment := Garment{}
 	err = garmentSearch.Decode(&garment)
 	if err != nil {
 		return "", err
 	}
 
+	res := events.APIGatewayProxyResponse{}
+	r, err := awslambda.NewReaderMultipart(request)
+	if err != nil {
+		return res, err
+	}
+	part, err := r.NextPart()
+	if err != nil {
+		return "", err
+	}
+	content, err := io.ReadAll(part)
+	if err != nil {
+		return "", err
+	}
+	custom := customStruct{
+		Content:       string(content),
+		FileName:      part.FileName(),
+		FileExtension: filepath.Ext(part.FileName())}
+
+	customBytes, err := json.Marshal(custom)
+	if err != nil {
+		return "", err
+	}
+
+	res = events.APIGatewayProxyResponse{
+		StatusCode: 200,
+		Headers: map[string]string{
+			"Content-Type": "application/json"},
+		Body: string(customBytes)}
+	return "", nil
+
 	// _, insertErr := coll.InsertOne(context.TODO(), garment)
 
 	// if insertErr != nil {
 	// 	return "", err
 	// }
-	return "", nil
+
 }
 
 func main() {
