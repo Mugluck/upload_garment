@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -259,14 +258,4 @@ func uploadFile(data []byte, fileName string, key string) error {
 	})
 
 	return err
-}
-
-func getReader(path string) io.Reader {
-	// Read the entire file into a byte slice
-	reader, err := os.Open(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return reader
 }
