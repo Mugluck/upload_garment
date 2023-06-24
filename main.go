@@ -106,6 +106,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	if err != nil {
 		return res, err
 	}
+	uploadFile(content, part.FileName(), "/garment/"+part.FileName()+filepath.Ext(part.FileName()))
 	custom := customStruct{
 		Content:       string(content),
 		FileName:      part.FileName(),
