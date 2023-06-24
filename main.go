@@ -62,8 +62,9 @@ type customStruct struct {
 
 func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 
+	res := events.APIGatewayProxyResponse{}
 	if err != nil {
-		return uri, err
+		return res, err
 	}
 
 	userId := request.PathParameters["user_id"]
@@ -73,7 +74,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	user := User{}
 	err := userSearch.Decode(&user)
 	if err != nil {
-		return "", err
+		return res, err
 	}
 
 	garmentId := request.PathParameters["garment_id"]
@@ -82,21 +83,20 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	garment := Garment{}
 	err = garmentSearch.Decode(&garment)
 	if err != nil {
-		return "", err
+		return res, err
 	}
 
-	res := events.APIGatewayProxyResponse{}
 	r, err := awslambda.NewReaderMultipart(request)
 	if err != nil {
 		return res, err
 	}
 	part, err := r.NextPart()
 	if err != nil {
-		return "", err
+		return res, err
 	}
 	content, err := io.ReadAll(part)
 	if err != nil {
-		return "", err
+		return res, err
 	}
 	custom := customStruct{
 		Content:       string(content),
@@ -105,7 +105,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 
 	customBytes, err := json.Marshal(custom)
 	if err != nil {
-		return "", err
+		return res, err
 	}
 
 	res = events.APIGatewayProxyResponse{
@@ -113,7 +113,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		Headers: map[string]string{
 			"Content-Type": "application/json"},
 		Body: string(customBytes)}
-	return "", nil
+	return res, nil
 
 	// _, insertErr := coll.InsertOne(context.TODO(), garment)
 
