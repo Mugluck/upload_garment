@@ -14,7 +14,6 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -59,29 +58,29 @@ func HandleRequest(ctx context.Context, event MyEvent) (string, error) {
 		return uri, err
 	}
 
-	db := client.Database("drape_manager").Collection("users")
+	users := client.Database("drape_manager").Collection("users")
 
-	result := db.FindOne(context.Background(), bson.M{"id": event.UserId})
+	userSearch := users.FindOne(context.Background(), bson.M{"id": event.UserId})
 	user := User{}
-	err := result.Decode(&user)
+	err := userSearch.Decode(&user)
 	if err != nil {
 		return "", err
 	}
 
-	id := uuid.New()
-	garment := Garment{
-		Id:      id.String(),
-		Name:    event.Name,
-		User_Id: user.Id,
-	}
-	coll := client.Database("drape_manager").Collection("garments")
-
-	_, insertErr := coll.InsertOne(context.TODO(), garment)
-
-	if insertErr != nil {
+	garments := client.Database("drape_manager").Collection("garments")
+	garmentSearch := garments.FindOne(context.Background(), bson.M{"id": event.UserId})
+	garment := Garment{}
+	err = garmentSearch.Decode(&garment)
+	if err != nil {
 		return "", err
 	}
-	return id.String(), nil
+
+	// _, insertErr := coll.InsertOne(context.TODO(), garment)
+
+	// if insertErr != nil {
+	// 	return "", err
+	// }
+	return "", nil
 }
 
 func main() {
