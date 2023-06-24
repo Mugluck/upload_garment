@@ -86,6 +86,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		return res, err
 	}
 
+	// now that we've established the db data, we can start uploading the file
 	r, err := awslambda.NewReaderMultipart(request)
 	if err != nil {
 		return res, err
