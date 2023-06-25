@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -16,6 +17,8 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/grokify/go-awslambda"
@@ -44,6 +47,9 @@ var ExposeServerErrors = true
 var uri = os.Getenv("ATLAS_URI")
 var awsBucket = os.Getenv("AWS_BUCKET")
 var awsS3Client *s3.Client
+var awsAccessKeyID = os.Getenv("KEY")
+var awsSecretAccessKey = os.Getenv("SECRET")
+var awsRegion = os.Getenv("REGION")
 var client, err = mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
 
 //endpoints
@@ -142,6 +148,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	// 	}, nil
 	// }
 
+	configS3()
 	err = uploadFile(part, part.FileName(), "/garment/"+part.FileName()+filepath.Ext(part.FileName()))
 	if err != nil {
 		return events.APIGatewayProxyResponse{
@@ -312,4 +319,20 @@ func uploadFile(data io.Reader, fileName string, key string) error {
 	})
 
 	return err
+}
+
+// configS3 creates the S3 client
+func configS3() {
+
+	// cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(AWS_S3_REGION), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("etest", "testw", "")))
+
+	cfg, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithRegion(awsRegion),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(awsAccessKeyID, awsSecretAccessKey, "")),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	awsS3Client = s3.NewFromConfig(cfg)
 }
