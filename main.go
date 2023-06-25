@@ -143,7 +143,17 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		}, nil
 	}
 
-	uploadFile(content, part.FileName(), "/garment/"+part.FileName()+filepath.Ext(part.FileName()))
+	err = uploadFile(content, part.FileName(), "/garment/"+part.FileName()+filepath.Ext(part.FileName()))
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "Upload failed : " + err.Error(),
+		}, nil
+	}
+
 	custom := customStruct{
 		Content:       string(content),
 		FileName:      part.FileName(),
