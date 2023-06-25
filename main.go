@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -132,18 +131,18 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		}, nil
 	}
 
-	content, err := io.ReadAll(part)
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 400,
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-			Body: "Get Content failed : " + err.Error(),
-		}, nil
-	}
+	// content, err := io.ReadAll(part)
+	// if err != nil {
+	// 	return events.APIGatewayProxyResponse{
+	// 		StatusCode: 400,
+	// 		Headers: map[string]string{
+	// 			"Content-Type": "application/json",
+	// 		},
+	// 		Body: "Get Content failed : " + err.Error(),
+	// 	}, nil
+	// }
 
-	err = uploadFile(content, part.FileName(), "/garment/"+part.FileName()+filepath.Ext(part.FileName()))
+	err = uploadFile(part, part.FileName(), "/garment/"+part.FileName()+filepath.Ext(part.FileName()))
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
@@ -155,7 +154,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	}
 
 	custom := customStruct{
-		Content:       string(content),
+		Content:       string(""),
 		FileName:      part.FileName(),
 		FileExtension: filepath.Ext(part.FileName())}
 
@@ -298,18 +297,18 @@ func MarshalResponse(httpStatus int, headers map[string]string, data interface{}
 	}, nil
 }
 
-func uploadFile(data []byte, fileName string, key string) error {
+func uploadFile(data io.Reader, fileName string, key string) error {
 
 	// Get a file from the form input name "file"
 	// get file body
 	// file := getReader(path + fileName)
-	reader := io.Reader(bytes.NewReader(data))
+	// reader := io.Reader(bytes.NewReader(data))
 
 	uploader := manager.NewUploader(awsS3Client)
 	_, err := uploader.Upload(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(awsBucket),
 		Key:    aws.String(key),
-		Body:   reader,
+		Body:   data,
 	})
 
 	return err
