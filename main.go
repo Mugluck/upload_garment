@@ -77,7 +77,7 @@ type File struct {
 	Name          string `json:"name"`
 	Key           string `json:"key"`
 	Disk          string `json:"disk"`
-	Type          string `json:"type"`
+	Type          int64  `json:"type"`
 }
 
 func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -173,11 +173,12 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		Name:          fileNameWithoutExtSliceNotation(fileName),
 		Key:           folder + fileName,
 		Disk:          "s3",
-		Type:          "original",
+		Type:          5,
 	}
 
 	files := client.Database("drape_manager").Collection("files")
 	_, insertErr := files.InsertOne(context.TODO(), file)
+	// info, err = garments.Find(context.Background(), bson.M{"id": garmentId}).Apply(change, &doc)
 	if insertErr != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 500,
