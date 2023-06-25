@@ -68,7 +68,6 @@ type customStruct struct {
 
 func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 
-	res := events.APIGatewayProxyResponse{}
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 500,
@@ -76,7 +75,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 				"Content-Type": "application/json",
 			},
 			Body: "Could not connect to db.",
-		}, err
+		}, nil
 	}
 
 	userId := request.PathParameters["user_id"]
@@ -92,7 +91,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 				"Content-Type": "application/json",
 			},
 			Body: "Could not find user. Data: " + userId,
-		}, err
+		}, nil
 	}
 
 	garmentId := request.PathParameters["garment_id"]
@@ -107,7 +106,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 				"Content-Type": "application/json",
 			},
 			Body: "Could not find garment. Data: " + garmentId,
-		}, err
+		}, nil
 	}
 
 	// now that we've established the db data, we can start uploading the file
@@ -119,7 +118,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 				"Content-Type": "application/json",
 			},
 			Body: "Reading failed : " + err.Error(),
-		}, err
+		}, nil
 	}
 
 	part, err := r.NextPart()
@@ -130,7 +129,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 				"Content-Type": "application/json",
 			},
 			Body: "Part failed : " + err.Error(),
-		}, err
+		}, nil
 	}
 
 	content, err := io.ReadAll(part)
@@ -141,7 +140,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 				"Content-Type": "application/json",
 			},
 			Body: "Get Content failed : " + err.Error(),
-		}, err
+		}, nil
 	}
 
 	uploadFile(content, part.FileName(), "/garment/"+part.FileName()+filepath.Ext(part.FileName()))
