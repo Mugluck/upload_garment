@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/google/uuid"
 	"github.com/grokify/go-awslambda"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -69,6 +70,20 @@ type customStruct struct {
 	Content       string
 	FileName      string
 	FileExtension string
+}
+
+type File struct {
+	Id            string `json:"id"`
+	FileName      string `json:"file_name"`
+	FileExtension string `json:"file_extension"`
+	Url           string `json:"url"`
+	Bucket        string `json:"bucket"`
+	MorphType     string `json:"morph_type"`
+	MorphId       string `json:"morph_id"`
+	Name          string `json:"name"`
+	Key           string `json:"key"`
+	Disk          string `json:"disk"`
+	Type          string `json:"type"`
 }
 
 func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -137,19 +152,11 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		}, nil
 	}
 
-	// content, err := io.ReadAll(part)
-	// if err != nil {
-	// 	return events.APIGatewayProxyResponse{
-	// 		StatusCode: 400,
-	// 		Headers: map[string]string{
-	// 			"Content-Type": "application/json",
-	// 		},
-	// 		Body: "Get Content failed : " + err.Error(),
-	// 	}, nil
-	// }
-
+	fileName := part.FileName()
+	extension := filepath.Ext(fileName)
+	folder := "garment/" + garmentId + "/original/"
 	configS3()
-	err = uploadFile(part, part.FileName(), "/garment/"+part.FileName()+filepath.Ext(part.FileName()))
+	err = uploadFile(part, fileName, folder+fileName)
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
@@ -159,13 +166,35 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 			Body: "Upload failed : " + err.Error(),
 		}, nil
 	}
+	// files are saved, we need to get the s3 info and the file info and save it against the garment
+	// to download the file, we need the bucket, the filename, and the url ( e.g. s3://drape-images//garment/garment_0000016_L_button.fbx.fbx)
+	file := File{
+		Id:            uuid.New().String(),
+		FileName:      fileName,
+		FileExtension: extension,
+		Url:           "s3://" + awsBucket + folder + fileName,
+		Bucket:        awsBucket,
+		MorphType:     "garment",
+		MorphId:       garmentId,
+		Name:          fileName,
+		Key:           folder + fileName,
+		Disk:          "s3",
+		Type:          "original",
+	}
 
-	custom := customStruct{
-		Content:       string(""),
-		FileName:      part.FileName(),
-		FileExtension: filepath.Ext(part.FileName())}
+	files := client.Database("drape_manager").Collection("files")
+	_, insertErr := files.InsertOne(context.TODO(), file)
+	if insertErr != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "File db saving failed : " + insertErr.Error(),
+		}, nil
+	}
 
-	customBytes, err := json.Marshal(custom)
+	customBytes, err := json.Marshal(file)
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
@@ -183,13 +212,6 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		},
 		Body: "File result: " + string(customBytes),
 	}, nil
-
-	// _, insertErr := coll.InsertOne(context.TODO(), garment)
-
-	// if insertErr != nil {
-	// 	return "", err
-	// }
-
 }
 
 func main() {
