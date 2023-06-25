@@ -66,12 +66,6 @@ type HTTPError struct {
 	Message string `json:"message"`
 }
 
-type customStruct struct {
-	Content       string
-	FileName      string
-	FileExtension string
-}
-
 type File struct {
 	Id            string `json:"id"`
 	FileName      string `json:"file_name"`
@@ -176,7 +170,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		Bucket:        awsBucket,
 		MorphType:     "garment",
 		MorphId:       garmentId,
-		Name:          fileName,
+		Name:          fileNameWithoutExtSliceNotation(fileName),
 		Key:           folder + fileName,
 		Disk:          "s3",
 		Type:          "original",
@@ -357,4 +351,8 @@ func configS3() {
 	}
 
 	awsS3Client = s3.NewFromConfig(cfg)
+}
+
+func fileNameWithoutExtSliceNotation(fileName string) string {
+	return fileName[:len(fileName)-len(filepath.Ext(fileName))]
 }
