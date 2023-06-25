@@ -70,7 +70,13 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 
 	res := events.APIGatewayProxyResponse{}
 	if err != nil {
-		return res, err
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "Could not connect to db.",
+		}, err
 	}
 
 	userId := request.PathParameters["user_id"]
@@ -80,7 +86,13 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	user := User{}
 	err := userSearch.Decode(&user)
 	if err != nil {
-		return res, err
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "Could not find user. Data: " + userId,
+		}, err
 	}
 
 	garmentId := request.PathParameters["garment_id"]
@@ -89,22 +101,49 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	garment := Garment{}
 	err = garmentSearch.Decode(&garment)
 	if err != nil {
-		return res, err
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "Could not find garment. Data: " + garmentId,
+		}, err
 	}
 
 	// now that we've established the db data, we can start uploading the file
 	r, err := awslambda.NewReaderMultipart(request)
 	if err != nil {
-		return res, err
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "Reading failed : " + err.Error(),
+		}, err
 	}
+
 	part, err := r.NextPart()
 	if err != nil {
-		return res, err
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "Part failed : " + err.Error(),
+		}, err
 	}
+
 	content, err := io.ReadAll(part)
 	if err != nil {
-		return res, err
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "Get Content failed : " + err.Error(),
+		}, err
 	}
+
 	uploadFile(content, part.FileName(), "/garment/"+part.FileName()+filepath.Ext(part.FileName()))
 	custom := customStruct{
 		Content:       string(content),
@@ -113,15 +152,22 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 
 	customBytes, err := json.Marshal(custom)
 	if err != nil {
-		return res, err
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "Marshall json data failed : " + err.Error(),
+		}, nil
 	}
 
-	res = events.APIGatewayProxyResponse{
+	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers: map[string]string{
-			"Content-Type": "application/json"},
-		Body: string(customBytes)}
-	return res, nil
+			"Content-Type": "application/json",
+		},
+		Body: "File result: " + string(customBytes),
+	}, nil
 
 	// _, insertErr := coll.InsertOne(context.TODO(), garment)
 
