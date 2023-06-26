@@ -13,14 +13,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/awsdocs/aws-doc-sdk-examples/gov2/s3/actions"
 	"github.com/google/uuid"
 	"github.com/grokify/go-awslambda"
 	"github.com/qiniu/qmgo"
@@ -83,6 +86,7 @@ type File struct {
 	Key           string `json:"key"`
 	Disk          string `json:"disk"`
 	Type          int64  `json:"type"`
+	PresignedURL  string `json:"presigned_url"`
 }
 
 func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -167,7 +171,10 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	extension := filepath.Ext(fileName)
 	folder := "garment/" + garmentId + "/original/"
 	configS3()
-	err = uploadFile(part, fileName, folder+fileName)
+	presignClient := s3.NewPresignClient(awsS3Client)
+	presigner := actions.Presigner{PresignClient: presignClient}
+	presignedPutRequest, err := presigner.PutObject(awsBucket, folder+fileName, 60)
+	// err = uploadFile(part, fileName, folder+fileName)
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
@@ -191,6 +198,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		Key:           folder + fileName,
 		Disk:          "s3",
 		Type:          5,
+		PresignedURL:  presignedPutRequest.URL,
 	}
 
 	files := client.Database("drape_manager").Collection("files")
@@ -424,4 +432,29 @@ func checkIfReady(garment Garment) bool {
 	} else {
 		return false
 	}
+}
+
+// Presigner encapsulates the Amazon Simple Storage Service (Amazon S3) presign actions
+// used in the examples.
+// It contains PresignClient, a client that is used to presign requests to Amazon S3.
+// Presigned requests contain temporary credentials and can be made from any HTTP client.
+type Presigner struct {
+	PresignClient *s3.PresignClient
+}
+
+// PutObject makes a presigned request that can be used to put an object in a bucket.
+// The presigned request is valid for the specified number of seconds.
+func (presigner Presigner) PutObject(
+	bucketName string, objectKey string, lifetimeSecs int64) (*v4.PresignedHTTPRequest, error) {
+	request, err := presigner.PresignClient.PresignPutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(objectKey),
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = time.Duration(lifetimeSecs * int64(time.Second))
+	})
+	if err != nil {
+		log.Printf("Couldn't get a presigned request to put %v:%v. Here's why: %v\n",
+			bucketName, objectKey, err)
+	}
+	return request, err
 }
