@@ -23,9 +23,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 	"github.com/grokify/go-awslambda"
+	"github.com/qiniu/qmgo"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type MyEvent struct {
@@ -34,9 +33,13 @@ type MyEvent struct {
 }
 
 type Garment struct {
-	Id      string `json:"id"`
-	Name    string `json:"name"`
-	User_Id string `json:"user_id"`
+	Id       string `json:"id"`
+	Name     string `json:"name"`
+	User_Id  string `json:"user_id"`
+	Material bool   `json:"material"`
+	Model    bool   `json:"model"`
+	Metadata bool   `json:"metadata"`
+	Render   bool   `json:"render"`
 }
 
 type User struct {
@@ -51,7 +54,9 @@ var awsS3Client *s3.Client
 var awsAccessKeyID = os.Getenv("KEY")
 var awsSecretAccessKey = os.Getenv("SECRET")
 var awsRegion = os.Getenv("REGION")
-var client, err = mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
+
+var db = client.Database("drape_manager")
+var client, err = qmgo.NewClient(context.Background(), &qmgo.Config{Uri: uri})
 
 //endpoints
 //new-garment -> user/{id}/
@@ -93,11 +98,11 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	}
 
 	userId := request.PathParameters["user_id"]
-	users := client.Database("drape_manager").Collection("users")
+	users := db.Collection("users")
 
-	userSearch := users.FindOne(context.Background(), bson.M{"id": userId})
 	user := User{}
-	err := userSearch.Decode(&user)
+	err = users.Find(context.Background(), bson.M{"id": userId}).One(&user)
+
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
@@ -109,10 +114,11 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	}
 
 	garmentId := request.PathParameters["garment_id"]
-	garments := client.Database("drape_manager").Collection("garments")
-	garmentSearch := garments.FindOne(context.Background(), bson.M{"id": garmentId})
+	garments := db.Collection("garments")
+
 	garment := Garment{}
-	err = garmentSearch.Decode(&garment)
+	err = garments.Find(context.Background(), bson.M{"id": garmentId}).One(&garment)
+
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
@@ -147,6 +153,17 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	}
 
 	fileName := part.FileName()
+	fileCategory := setUpdateFile(fileName)
+	if fileCategory == "unknown" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "File type not supported.",
+		}, nil
+	}
+
 	extension := filepath.Ext(fileName)
 	folder := "garment/" + garmentId + "/original/"
 	configS3()
@@ -186,6 +203,31 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 				"Content-Type": "application/json",
 			},
 			Body: "File db saving failed : " + insertErr.Error(),
+		}, nil
+	}
+
+	//update garment to mark file upload status'
+	err = garments.UpdateOne(context.Background(), bson.M{"id": garmentId}, bson.M{"$set": bson.M{fileCategory: true}})
+
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "garment updating failed : " + insertErr.Error(),
+		}, nil
+	}
+
+	garments.Find(context.Background(), bson.M{"id": garmentId}).One(&garment)
+	if checkIfReady(garment) {
+		// kick off job
+		return events.APIGatewayProxyResponse{
+			StatusCode: 200,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "Garment ready",
 		}, nil
 	}
 
@@ -356,4 +398,30 @@ func configS3() {
 
 func fileNameWithoutExtSliceNotation(fileName string) string {
 	return fileName[:len(fileName)-len(filepath.Ext(fileName))]
+}
+
+func setUpdateFile(fileName string) string {
+
+	if fileName == "start_meshes.mtl" {
+		return "material"
+	}
+	if fileName == "start_meshes.obj" {
+		return "model"
+	}
+	if fileName == "start_meshes_meta_data.xml" {
+		return "metadata"
+	}
+	if fileName == "render_meshes.fbx" {
+		return "render"
+	}
+	return "unknown"
+}
+
+func checkIfReady(garment Garment) bool {
+
+	if garment.Material && garment.Model && garment.Metadata && garment.Render {
+		return true
+	} else {
+		return false
+	}
 }
