@@ -21,7 +21,6 @@ import (
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/awsdocs/aws-doc-sdk-examples/gov2/s3/actions"
 	"github.com/google/uuid"
@@ -157,7 +156,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	configS3()
 	presignClient := s3.NewPresignClient(awsS3Client)
 	presigner := actions.Presigner{PresignClient: presignClient}
-	presignedPutRequest, err := presigner.PutObject(awsBucket, folder+fileName, 60)
+	presignedPutRequest, err := presigner.PutObject(awsBucket, folder+fileName, 600)
 	// err = uploadFile(part, fileName, folder+fileName)
 	if err != nil {
 		return events.APIGatewayProxyResponse{
@@ -211,18 +210,6 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		}, nil
 	}
 
-	garments.Find(context.Background(), bson.M{"id": garmentId}).One(&garment)
-	if checkIfReady(garment) {
-		// kick off job
-		return events.APIGatewayProxyResponse{
-			StatusCode: 200,
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-			Body: "Garment ready",
-		}, nil
-	}
-
 	customBytes, err := json.Marshal(file)
 	if err != nil {
 		return events.APIGatewayProxyResponse{
@@ -231,6 +218,18 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 				"Content-Type": "application/json",
 			},
 			Body: "Marshall json data failed : " + err.Error(),
+		}, nil
+	}
+
+	garments.Find(context.Background(), bson.M{"id": garmentId}).One(&garment)
+	if checkIfReady(garment) {
+		// kick off job
+		return events.APIGatewayProxyResponse{
+			StatusCode: 200,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "Garment ready: " + string(customBytes),
 		}, nil
 	}
 
@@ -355,22 +354,22 @@ func MarshalResponse(httpStatus int, headers map[string]string, data interface{}
 	}, nil
 }
 
-func uploadFile(data io.Reader, fileName string, key string) error {
+// func uploadFile(data io.Reader, fileName string, key string) error {
 
-	// Get a file from the form input name "file"
-	// get file body
-	// file := getReader(path + fileName)
-	// reader := io.Reader(bytes.NewReader(data))
+// 	// Get a file from the form input name "file"
+// 	// get file body
+// 	// file := getReader(path + fileName)
+// 	// reader := io.Reader(bytes.NewReader(data))
 
-	uploader := manager.NewUploader(awsS3Client)
-	_, err := uploader.Upload(context.TODO(), &s3.PutObjectInput{
-		Bucket: aws.String(awsBucket),
-		Key:    aws.String(key),
-		Body:   data,
-	})
+// 	uploader := manager.NewUploader(awsS3Client)
+// 	_, err := uploader.Upload(context.TODO(), &s3.PutObjectInput{
+// 		Bucket: aws.String(awsBucket),
+// 		Key:    aws.String(key),
+// 		Body:   data,
+// 	})
 
-	return err
-}
+// 	return err
+// }
 
 // configS3 creates the S3 client
 func configS3() {
