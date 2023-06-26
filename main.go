@@ -25,7 +25,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/awsdocs/aws-doc-sdk-examples/gov2/s3/actions"
 	"github.com/google/uuid"
-	"github.com/grokify/go-awslambda"
 	"github.com/qiniu/qmgo"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -89,6 +88,11 @@ type File struct {
 	PresignedURL  string `json:"presigned_url"`
 }
 
+type Input struct {
+	FileName      string `json:"file_name"`
+	FileExtension string `json:"file_extension"`
+}
+
 func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 
 	if err != nil {
@@ -102,6 +106,9 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	}
 
 	userId := request.PathParameters["user_id"]
+	input := Input{}
+	json.Unmarshal([]byte(request.Body), &input)
+
 	users := db.Collection("users")
 
 	user := User{}
@@ -133,30 +140,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		}, nil
 	}
 
-	// now that we've established the db data, we can start uploading the file
-	r, err := awslambda.NewReaderMultipart(request)
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 400,
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-			Body: "Reading failed : " + err.Error(),
-		}, nil
-	}
-
-	part, err := r.NextPart()
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 400,
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-			Body: "Part failed : " + err.Error(),
-		}, nil
-	}
-
-	fileName := part.FileName()
+	fileName := input.FileName
 	fileCategory := setUpdateFile(fileName)
 	if fileCategory == "unknown" {
 		return events.APIGatewayProxyResponse{
@@ -168,7 +152,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		}, nil
 	}
 
-	extension := filepath.Ext(fileName)
+	extension := input.FileExtension
 	folder := "garment/" + garmentId + "/original/"
 	configS3()
 	presignClient := s3.NewPresignClient(awsS3Client)
