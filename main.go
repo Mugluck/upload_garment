@@ -197,8 +197,21 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		}, nil
 	}
 
-	//update garment to mark file upload status'
+	//update garment to mark file upload status
 	err = garments.UpdateOne(context.Background(), bson.M{"id": garmentId}, bson.M{"$set": bson.M{fileCategory: true}})
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "garment updating failed : " + insertErr.Error(),
+		}, nil
+	}
+
+	// update the garment to mark file link
+	fileCategoryId := fileCategory + "_id"
+	err = garments.UpdateOne(context.Background(), bson.M{"id": garmentId}, bson.M{"$set": bson.M{fileCategoryId: file.Id}})
 
 	if err != nil {
 		return events.APIGatewayProxyResponse{
@@ -394,16 +407,16 @@ func fileNameWithoutExtSliceNotation(fileName string) string {
 func setUpdateFile(fileName string) string {
 
 	if fileName == "start_meshes.mtl" {
-		return "material"
+		return "material_flag"
 	}
 	if fileName == "start_meshes.obj" {
-		return "model"
+		return "model_flag"
 	}
 	if fileName == "start_meshes_meta_data.xml" {
-		return "metadata"
+		return "metadata_flag"
 	}
 	if fileName == "render_meshes.fbx" {
-		return "render"
+		return "render_flag"
 	}
 	return "unknown"
 }
