@@ -78,8 +78,8 @@ type File struct {
 	FileExtension string `json:"file_extension"`
 	Url           string `json:"url"`
 	Bucket        string `json:"bucket"`
-	MorphType     string `json:"morph_type"`
-	MorphId       string `json:"morph_id"`
+	Fileable_Type string `json:"fileable_type"`
+	Fileable_Id   string `json:"fileable_id"`
 	Name          string `json:"name"`
 	Key           string `json:"key"`
 	Disk          string `json:"disk"`
@@ -175,8 +175,8 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		FileExtension: extension,
 		Url:           "s3://" + awsBucket + folder + fileName,
 		Bucket:        awsBucket,
-		MorphType:     "garment",
-		MorphId:       garmentId,
+		Fileable_Type: "garment",
+		Fileable_Id:   garmentId,
 		Name:          fileNameWithoutExtSliceNotation(fileName),
 		Key:           folder + fileName,
 		Disk:          "s3",
