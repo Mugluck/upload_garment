@@ -34,13 +34,13 @@ type MyEvent struct {
 }
 
 type Garment struct {
-	Id       string `json:"id"`
-	Name     string `json:"name"`
-	User_Id  string `json:"user_id"`
-	Material bool   `json:"material"`
-	Model    bool   `json:"model"`
-	Metadata bool   `json:"metadata"`
-	Render   bool   `json:"render"`
+	Id            string `json:"id"`
+	Name          string `json:"name"`
+	User_Id       string `json:"user_id"`
+	Material_Flag bool   `json:"material_flag"`
+	Model_Flag    bool   `json:"model_flag"`
+	Metadata_Flag bool   `json:"metadata_flag"`
+	Render_Flag   bool   `json:"render_flag"`
 }
 
 type User struct {
@@ -100,7 +100,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 			Headers: map[string]string{
 				"Content-Type": "application/json",
 			},
-			Body: "Could not connect to db.",
+			Body: "Could not connect to db: " + err.Error(),
 		}, nil
 	}
 
@@ -135,7 +135,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 			Headers: map[string]string{
 				"Content-Type": "application/json",
 			},
-			Body: "Could not find garment. Data: " + garmentId,
+			Body: "Could not find garment. Data: " + garmentId + " " + err.Error(),
 		}, nil
 	}
 
@@ -423,7 +423,7 @@ func setUpdateFile(fileName string) string {
 
 func checkIfReady(garment Garment) bool {
 
-	if garment.Material && garment.Model && garment.Metadata && garment.Render {
+	if garment.Material_Flag && garment.Model_Flag && garment.Metadata_Flag && garment.Render_Flag {
 		return true
 	} else {
 		return false
